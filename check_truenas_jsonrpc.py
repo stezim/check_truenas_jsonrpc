@@ -54,13 +54,9 @@ import asyncio
 import json
 import ssl
 import sys
-from websockets.sync.client import connect
 import argparse
-#import json
-#import string
-#import urllib3
-#import requests
 import logging
+from websockets.sync.client import connect
 from dataclasses import dataclass
 from enum import Enum
 
@@ -132,7 +128,7 @@ class Startup(object):
             else:
                 ws = connect(request_url, ssl=self._ssl_context)
 
-            if self._user:
+            if (self._user):
                 ws.send(json.dumps({
                     'jsonrpc': '2.0',
                     'method': 'auth.login',
@@ -155,41 +151,7 @@ class Startup(object):
                 'id': 1
             }))
             r = json.loads(ws.recv())
-            #print (f"{r}")
             return r.get("result")
-            # GET Request
-            #if (requestType is RequestTypeEnum.GET_REQUEST):
-            #    if (optionalPayload):
-            #        r = requests.get(request_url, 
-            #                        auth=auth,
-            #                        headers=headers,
-            #                        data=optionalPayloadAsJson,
-            #                        verify=self._verify_cert)
-            #    else:
-            #        r = requests.get(request_url, 
-            #                        auth=auth,
-            #                        headers=headers,
-            #                        verify=self._verify_cert)                    
-            #    logging.debug('GET request response: %s', r.text)
-            # POST Request                
-            #elif (requestType is RequestTypeEnum.POST_REQUEST):
-            #    if (optionalPayload):                
-            #        r = requests.post(request_url, 
-            #                        auth=auth,
-            #                        headers=headers,
-            #                        data=optionalPayloadAsJson,
-            #                        verify=self._verify_cert)
-            #    else:
-            #        r = requests.post(request_url, 
-            #                        auth=auth,
-            #                        headers=headers,
-            #                        verify=self._verify_cert)
-            #    logging.debug('POST request response: %s', r.text)
-            #else:
-            #    print ('UNKNOWN - request failed - Unknown RequestType: ' + requestType)
-            #    sys.exit(3)
-
-            #r.raise_for_status()
         except:
             print ('UNKNOWN - request failed - Error when contacting TrueNAS server: ' + str(sys.exc_info()) )
             sys.exit(3)
@@ -264,21 +226,21 @@ class Startup(object):
         
         try:
             logging.debug('Update check result: %s', updateCheckResult)
-            if updateCheckResult['code'] == "NORMAL":
+            if (updateCheckResult['code'] == "NORMAL"):
                 try: 
                     updateCheckResultVersion = updateCheckResult['status']['new_version']['version']
                     updateCheckResultDownloadStatus = updateCheckResult['update_download_progress']['description']
                     needsUpdateOrOtherPossibleIssue = True
                 except: 
                     needsUpdateOrOtherPossibleIssue = False
-            elif updateCheckResult['code'] == "ERROR":
+            elif (updateCheckResult['code'] == "ERROR"):
                 needsUpdateOrOtherPossibleIssue = True
 
         except:
             print ('UNKNOWN - check_update() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
             sys.exit(3)
  
-        if needsUpdateOrOtherPossibleIssue:
+        if (needsUpdateOrOtherPossibleIssue):
 
             if (updateCheckResultVersion):
                 print ('WARNING - Update to Version ' + updateCheckResultVersion + ' available. ' +updateCheckResultDownloadStatus)
@@ -614,4 +576,3 @@ def main():
  
 if __name__ == '__main__':
     main()
-    
