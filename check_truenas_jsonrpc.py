@@ -4,6 +4,7 @@
 # Copyright (c) 2015 Goran Tornqvist
 # Extended by Stewart Loving-Gibbard 2020, 2021, 2022, 2023
 # Additional help from Folke Ashberg 2021
+# Updated by Steffen Zimmermann 2026
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -538,20 +539,20 @@ class Startup(object):
             #print('Should be setting no logging level at all')
             logger.setLevel(logging.CRITICAL)
 
-check_truenas_script_version = '1.42'
+check_truenas_script_version = '2.0'
 
 default_zpool_warning_percent = 80
 default_zool_critical_percent = 90
 
 def main():
     # Build parser for arguments
-    parser = argparse.ArgumentParser(description='Checks a TrueNAS/FreeNAS server using the 2.0 API. Version ' + check_truenas_script_version)
+    parser = argparse.ArgumentParser(description='Checks a TrueNAS server using the JSON-RPC 2.0 over WebSocket API. Version ' + check_truenas_script_version)
     parser.add_argument('-H', '--hostname', required=True, type=str, help='Hostname or IP address')
-    parser.add_argument('-u', '--user', required=False, type=str, help='Username, only root works, if not specified: use API Key')
+    parser.add_argument('-u', '--user', required=False, type=str, help='Username, if not specified: use API Key')
     parser.add_argument('-p', '--passwd', required=True, type=str, help='Password or API Key')
     parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, or update')
     parser.add_argument('-pn', '--zpoolname', required=False, type=str, default='all', help='For check type zpool, the name of zpool to check. Optional; defaults to all zpools.')
-    parser.add_argument('-ns', '--no-ssl', required=False, action='store_true', help='Disable SSL (use HTTP); default is to use SSL (use HTTPS)')
+    parser.add_argument('-ns', '--no-ssl', required=False, action='store_true', help='Disable SSL (use WS); default is to use SSL (use WSS)')
     parser.add_argument('-nv', '--no-verify-cert', required=False, action='store_true', help='Do not verify the server SSL cert; default is to verify the SSL cert')
     parser.add_argument('-ig', '--ignore-dismissed-alerts', required=False, action='store_true', help='Ignore alerts that have already been dismissed in FreeNas/TrueNAS; default is to treat them as relevant')
     parser.add_argument('-d', '--debug', required=False, action='store_true', help='Display debugging information; run script this way and record result when asking for help.')
