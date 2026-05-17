@@ -91,9 +91,9 @@ class Startup(object):
         self._cfree = zpool_critical
         self._show_zpool_perfdata = show_zpool_perfdata
  
-        http_request_header = 'https' if use_ssl else 'http'
+        ws_request_header = 'wss' if use_ssl else 'ws'
  
-        self._base_url = ('wss://%s/api/current' % (hostname) )
+        self._base_url = ('%s://%s/api/current' % (ws_request_header, hostname) )
         
         self.setup_logging()
         self.log_startup_information()
@@ -127,14 +127,25 @@ class Startup(object):
                 self._ssl_context.check_hostname = False
                 self._ssl_context.verify_mode = ssl.CERT_NONE
             
-            ws = connect(request_url, ssl=self._ssl_context)
+            if (self._use_ssl == False):
+                ws = connect(request_url)
+            else:
+                ws = connect(request_url, ssl=self._ssl_context)
 
-            ws.send(json.dumps({
-                'jsonrpc': '2.0',
-                'method': 'auth.login_with_api_key',
-                'params': [self._secret],
-                'id': 1
-            }))
+            if self._user:
+                ws.send(json.dumps({
+                    'jsonrpc': '2.0',
+                    'method': 'auth.login',
+                    'params': [self._user, self._secret],
+                    'id': 1
+                }))
+            else:
+                ws.send(json.dumps({
+                    'jsonrpc': '2.0',
+                    'method': 'auth.login_with_api_key',
+                    'params': [self._secret],
+                    'id': 1
+                }))
             ws.recv()
 
             ws.send(json.dumps({
