@@ -59,11 +59,6 @@ import argparse
 import logging
 from websockets.sync.client import connect
 from dataclasses import dataclass
-from enum import Enum
-
-class RequestTypeEnum(Enum):
-    GET_REQUEST = 1
-    POST_REQUEST = 2
 
 @dataclass
 class ZpoolCapacity:
@@ -108,16 +103,10 @@ class Startup(object):
  
 
     # Do a GET or POST request
-    def do_request(self, resource, requestType, optionalPayload):
+    def do_request(self, resource):
         try:
             request_url = self._base_url
             logging.debug('request_url: %s', request_url)
-            logging.debug('requestType: ' + repr(requestType))
-            #logging.debug('optionalPayloadAsJson:' + optionalPayloadAsJson)
-
-            # We assume that all incoming payloads are JSON. 
-            optionalPayloadAsJson = json.dumps(optionalPayload)
-            logging.debug('optionalPayloadAsJson:' + optionalPayloadAsJson)
             
             if (self._verify_cert == False):
                 self._ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -164,24 +153,8 @@ class Startup(object):
             print ('UNKNOWN - json failed to parse - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
             sys.exit(3)
 
-    # GET request
-    def get_request(self, resource):
-        return self.do_request(resource, RequestTypeEnum.GET_REQUEST, None)
-
-    # GET request with payload
-    def get_request_with_payload(self, resource, optionalPayload):
-        return self.do_request(resource, RequestTypeEnum.GET_REQUEST, optionalPayload)
-
-    # POST request
-    def post_request(self, resource):
-        return self.do_request(resource, RequestTypeEnum.POST_REQUEST, None)
-
-    # POST request with payload
-    def post_request_with_payload(self, resource, optionalPayload):
-        return self.do_request(resource, RequestTypeEnum.POST_REQUEST, optionalPayload)
-
     def check_repl(self):
-        repls = self.get_request('replication.query')
+        repls = self.do_request('replication.query')
         errors=0
         msg=''
         replications_examined = ''
@@ -216,7 +189,7 @@ class Startup(object):
 
 
     def check_update(self):
-        updateCheckResult = self.post_request('update.status')
+        updateCheckResult = self.do_request('update.status')
         warnings=0
         errors=0
         msg=''
@@ -255,7 +228,7 @@ class Startup(object):
 
 
     def check_alerts(self):
-        alerts = self.get_request('alert.list')
+        alerts = self.do_request('alert.list')
         
         logging.debug('alerts: %s', alerts)
         
@@ -290,7 +263,7 @@ class Startup(object):
             sys.exit(0)
  
     def check_zpool(self):
-        pool_results = self.get_request('pool.query')
+        pool_results = self.do_request('pool.query')
 
         #logging.debug('pool_results: %s', pool_results)
         
@@ -379,7 +352,7 @@ class Startup(object):
             },
              'query-filters': []   
         }     
-        dataset_results = self.get_request_with_payload('pool.dataset.query', datasetPayload)
+        dataset_results = self.do_request('pool.dataset.query')
 
         warn=0
         crit=0
