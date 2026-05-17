@@ -49,11 +49,17 @@ MIN_PYTHON = (3, 7)
 if sys.version_info < MIN_PYTHON:
     sys.exit("Python %s.%s or later is required.\n" % MIN_PYTHON)
 
-import argparse
+
+import asyncio
 import json
-import string
-import urllib3
-import requests
+import ssl
+import sys
+from websockets.sync.client import connect
+import argparse
+#import json
+#import string
+#import urllib3
+#import requests
 import logging
 from dataclasses import dataclass
 from enum import Enum
@@ -77,6 +83,7 @@ class Startup(object):
         self._secret = secret
         self._use_ssl = use_ssl
         self._verify_cert = verify_cert
+        self._ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         self._ignore_dismissed_alerts = ignore_dismissed_alerts
         self._debug_logging = debug_logging
         self._zpool_name = zpool_name
@@ -86,7 +93,7 @@ class Startup(object):
  
         http_request_header = 'https' if use_ssl else 'http'
  
-        self._base_url = ('%s://%s/api/v2.0' % (http_request_header, hostname) )
+        self._base_url = ('wss://%s/api/current' % (hostname) )
         
         self.setup_logging()
         self.log_startup_information()
@@ -106,7 +113,7 @@ class Startup(object):
     # Do a GET or POST request
     def do_request(self, resource, requestType, optionalPayload):
         try:
-            request_url = '%s/%s/' % (self._base_url, resource)
+            request_url = self._base_url
             logging.debug('request_url: %s', request_url)
             logging.debug('requestType: ' + repr(requestType))
             #logging.debug('optionalPayloadAsJson:' + optionalPayloadAsJson)
@@ -115,62 +122,73 @@ class Startup(object):
             optionalPayloadAsJson = json.dumps(optionalPayload)
             logging.debug('optionalPayloadAsJson:' + optionalPayloadAsJson)
             
-            # We get annoying warning text output from the urllib3 library if we fail to do this
-            if (not self._verify_cert):
-                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            auth=False
-            headers={}
-
-            # If username provided, try to authenticate with username/password combo
-            if (self._user): 
-                auth=(self._user, self._secret)
-            # Otherwise, use API key
-            else: 
-                headers={'Authorization': 'Bearer ' + self._secret}
+            if (self._verify_cert == False):
+                self._ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                self._ssl_context.check_hostname = False
+                self._ssl_context.verify_mode = ssl.CERT_NONE
             
-            # GET Request
-            if (requestType is RequestTypeEnum.GET_REQUEST):
-                if (optionalPayload):
-                    r = requests.get(request_url, 
-                                    auth=auth,
-                                    headers=headers,
-                                    data=optionalPayloadAsJson,
-                                    verify=self._verify_cert)
-                else:
-                    r = requests.get(request_url, 
-                                    auth=auth,
-                                    headers=headers,
-                                    verify=self._verify_cert)                    
-                logging.debug('GET request response: %s', r.text)
-            # POST Request                
-            elif (requestType is RequestTypeEnum.POST_REQUEST):
-                if (optionalPayload):                
-                    r = requests.post(request_url, 
-                                    auth=auth,
-                                    headers=headers,
-                                    data=optionalPayloadAsJson,
-                                    verify=self._verify_cert)
-                else:
-                    r = requests.post(request_url, 
-                                    auth=auth,
-                                    headers=headers,
-                                    verify=self._verify_cert)
-                logging.debug('POST request response: %s', r.text)
-            else:
-                print ('UNKNOWN - request failed - Unknown RequestType: ' + requestType)
-                sys.exit(3)
+            ws = connect(request_url, ssl=self._ssl_context)
 
-            r.raise_for_status()
+            ws.send(json.dumps({
+                'jsonrpc': '2.0',
+                'method': 'auth.login_with_api_key',
+                'params': [self._secret],
+                'id': 1
+            }))
+            ws.recv()
+
+            ws.send(json.dumps({
+                'jsonrpc': '2.0',
+                'method': resource,
+                'params': [],
+                'id': 1
+            }))
+            r = json.loads(ws.recv())
+            #print (f"{r}")
+            return r.get("result")
+            # GET Request
+            #if (requestType is RequestTypeEnum.GET_REQUEST):
+            #    if (optionalPayload):
+            #        r = requests.get(request_url, 
+            #                        auth=auth,
+            #                        headers=headers,
+            #                        data=optionalPayloadAsJson,
+            #                        verify=self._verify_cert)
+            #    else:
+            #        r = requests.get(request_url, 
+            #                        auth=auth,
+            #                        headers=headers,
+            #                        verify=self._verify_cert)                    
+            #    logging.debug('GET request response: %s', r.text)
+            # POST Request                
+            #elif (requestType is RequestTypeEnum.POST_REQUEST):
+            #    if (optionalPayload):                
+            #        r = requests.post(request_url, 
+            #                        auth=auth,
+            #                        headers=headers,
+            #                        data=optionalPayloadAsJson,
+            #                        verify=self._verify_cert)
+            #    else:
+            #        r = requests.post(request_url, 
+            #                        auth=auth,
+            #                        headers=headers,
+            #                        verify=self._verify_cert)
+            #    logging.debug('POST request response: %s', r.text)
+            #else:
+            #    print ('UNKNOWN - request failed - Unknown RequestType: ' + requestType)
+            #    sys.exit(3)
+
+            #r.raise_for_status()
         except:
             print ('UNKNOWN - request failed - Error when contacting TrueNAS server: ' + str(sys.exc_info()) )
             sys.exit(3)
  
-        if r.ok:
-            try:
-                return r.json()
-            except:
-                print ('UNKNOWN - json failed to parse - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
-                sys.exit(3)
+        #if r.ok:
+        try:
+            return r.get("result")
+        except:
+            print ('UNKNOWN - json failed to parse - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
+            sys.exit(3)
 
     # GET request
     def get_request(self, resource):
@@ -189,7 +207,7 @@ class Startup(object):
         return self.do_request(resource, RequestTypeEnum.POST_REQUEST, optionalPayload)
 
     def check_repl(self):
-        repls = self.get_request('replication')
+        repls = self.get_request('replication.query')
         errors=0
         msg=''
         replications_examined = ''
@@ -224,46 +242,46 @@ class Startup(object):
 
 
     def check_update(self):
-        updateCheckResult = self.post_request('update/check_available')
+        updateCheckResult = self.post_request('update.status')
         warnings=0
         errors=0
         msg=''
         needsUpdateOrOtherPossibleIssue=False
-        updateCheckResultString=''
-
-        # From https://www.truenas.com/docs/api/rest.html#api-Update-updateCheckAvailablePost
-        updateCheckResultDict = {
-            'UNAVAILABLE': 'no update available',
-            'AVAILABLE': 'an update is available',
-            'REBOOT_REQUIRED': 'an update has already been applied',
-            'HA_UNAVAILABLE': 'HA is non-functional'
-        }
-
+        updateCheckResultVersion=''
+        updateCheckResultDownloadStatus=''
+        updateMissionCritical=False
+        
         try:
             logging.debug('Update check result: %s', updateCheckResult)
-            
-            updateCheckResultString = updateCheckResult['status']
-            # Despite that it sounds error-y, 'UNAVAILABLE' is actually the normal everything-is-ok state.
-            needsUpdateOrOtherPossibleIssue = (updateCheckResultString != 'UNAVAILABLE')
+            if updateCheckResult['code'] == "NORMAL":
+                try: 
+                    updateCheckResultVersion = updateCheckResult['status']['new_version']['version']
+                    updateCheckResultDownloadStatus = updateCheckResult['update_download_progress']['description']
+                    needsUpdateOrOtherPossibleIssue = True
+                except: 
+                    needsUpdateOrOtherPossibleIssue = False
+            elif updateCheckResult['code'] == "ERROR":
+                needsUpdateOrOtherPossibleIssue = True
 
         except:
             print ('UNKNOWN - check_update() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
             sys.exit(3)
  
         if needsUpdateOrOtherPossibleIssue:
-            if (updateCheckResultString in updateCheckResultDict):
-                print ('WARNING - Update Status: ' + updateCheckResultString + ' (' + updateCheckResultDict[updateCheckResultString] + '). Update may be required. Go to TrueNAS Dashboard -> System -> Update to check for newer version.')
+
+            if (updateCheckResultVersion):
+                print ('WARNING - Update to Version ' + updateCheckResultVersion + ' available. ' +updateCheckResultDownloadStatus)
             # Unfamiliar status we've never seen before    
             else:
                 print ('WARNING - Unknown Update Status: ' + updateCheckResultString + '. Update may be required. Go to TrueNAS Dashboard -> System -> Update to check for newer version.')
             sys.exit(1)
         else:
-            print ('OK - Update Status: ' + updateCheckResultString + ' (' + updateCheckResultDict[updateCheckResultString] + ')')
+            print ('OK - No update available.')
             sys.exit(0)
 
 
     def check_alerts(self):
-        alerts = self.get_request('alert/list')
+        alerts = self.get_request('alert.list')
         
         logging.debug('alerts: %s', alerts)
         
@@ -298,7 +316,7 @@ class Startup(object):
             sys.exit(0)
  
     def check_zpool(self):
-        pool_results = self.get_request('pool')
+        pool_results = self.get_request('pool.query')
 
         #logging.debug('pool_results: %s', pool_results)
         
@@ -387,7 +405,7 @@ class Startup(object):
             },
              'query-filters': []   
         }     
-        dataset_results = self.get_request_with_payload('pool/dataset', datasetPayload)
+        dataset_results = self.get_request_with_payload('pool.dataset.query', datasetPayload)
 
         warn=0
         crit=0
