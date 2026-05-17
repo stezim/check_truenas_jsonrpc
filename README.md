@@ -1,190 +1,56 @@
-# Check TrueNAS - Extended Play
-This is a TrueNAS/FreeNAS Nagios check script. Checks for Alerts, Pool health, Pool capacity, Replication errors, TrueNAS software updates, etc.
+# Check TrueNAS - JSON-RPC 2.0 over WebSocket API
+This is a Nagios/Icinga check plugin using the TrueNAS "JSON-RPC 2.0 over WebSocket" API to check for Alerts, Pool health, Pool capacity, Replication errors and TrueNAS software updates (update check requires TrueNAS 25.10+). I forked this from Stewart Loving-Gibbard (https://github.com/StewLG/check_truenas_extended_play) because TrueNAS will stop supporting the legacy REST API starting with version 26. 
 
-This is an updated version of `check_truenas.py`, written by Goran Tornqvist, and originally found here:
+I have tested this with two TrueNAS 25.10.2 Systems and one TrueNAS 26.0.0-BETA.1 System. There are might still be egde-cases where this script does not work.  
+Feel free to open an issue for bugs, improvements or feature requests.
 
-https://exchange.nagios.org/directory/Plugins/Hardware/Storage-Systems/SAN-and-NAS/Check-TrueNAS-Health-2FReplication/details
+# Overview
 ```
-Checks a TrueNAS/FreeNAS server using the 2.0 API. Version 1.42
+usage: check_truenas_jsonrpc.py [-h] -H HOSTNAME [-u USER] -p PASSWD -t TYPE [-pn ZPOOLNAME] [-ns] [-nv] [-ig] [-d] [-zw ZPOOL_WARN] [-zc ZPOOL_CRITICAL] [-zp]
 
-optional arguments:
+Checks a TrueNAS server using the JSON-RPC 2.0 over WebSocket API. Version 2.0
+
+options:
   -h, --help            show this help message and exit
-  -H HOSTNAME, --hostname HOSTNAME
+  -H, --hostname HOSTNAME
                         Hostname or IP address
-  -u USER, --user USER  Username, only root works, if not specified: use API Key
-  -p PASSWD, --passwd PASSWD
-                        Password or API Key
-  -t TYPE, --type TYPE  Type of check, either alerts, zpool, zpool_capacity, repl, or update
-  -pn ZPOOLNAME, --zpoolname ZPOOLNAME
+  -u, --user USER       Username, if not specified: use API Key
+  -p, --passwd PASSWD   Password or API Key
+  -t, --type TYPE       Type of check, either alerts, zpool, zpool_capacity, repl, or update
+  -pn, --zpoolname ZPOOLNAME
                         For check type zpool, the name of zpool to check. Optional; defaults to all zpools.
-  -ns, --no-ssl         Disable SSL (use HTTP); default is to use SSL (use HTTPS)
+  -ns, --no-ssl         Disable SSL (use WS); default is to use SSL (use WSS)
   -nv, --no-verify-cert
                         Do not verify the server SSL cert; default is to verify the SSL cert
   -ig, --ignore-dismissed-alerts
-                        Ignore alerts that have already been dismissed in FreeNas/TrueNAS; default is to treat them as
-                        relevant
+                        Ignore alerts that have already been dismissed in FreeNas/TrueNAS; default is to treat them as relevant
   -d, --debug           Display debugging information; run script this way and record result when asking for help.
-  -zw ZPOOL_WARN, --zpool-warn ZPOOL_WARN
-                        ZPool warning storage capacity free threshold. Give a percent value in the range 1-100,
-                        defaults to 80%. Used with zpool_capacity check.
-  -zc ZPOOL_CRITICAL, --zpool-critical ZPOOL_CRITICAL
-                        ZPool critical storage capacity free threshold. Give a percent value in the range 1-100,
-                        defaults to 90%. Used with zpool_capacity check.
+  -zw, --zpool-warn ZPOOL_WARN
+                        ZPool warning storage capacity free threshold. Give a percent value in the range 1-100, defaults to 80%. Used with zpool_capacity check.
+  -zc, --zpool-critical ZPOOL_CRITICAL
+                        ZPool critical storage capacity free threshold. Give a percent value in the range 1-100, defaults to 90%. Used with zpool_capacity check.
   -zp, --zpool-perfdata
                         Add Zpool capacity perf data to output. Used with zpool_capacity check.
+
 ```
 # Requirements
 
-- Python 3.7 or greater
-   
-  If you get an error like:
-  
-      File "./check_truenas_extended_play.py", line 48
-        ZpoolName: str
+- Python 3.10 or greater
+- python3-websockets
 
-  Check to make sure you are running an up-to-date Python.
+# Authentication
+I recommend setting up a read-only user for monitoring with the following privileges:
 
-- python3-urllib3
-- python3-requests
+- Alert Read
+- Dataset Read
+- Pool Read
+- Replication Task Read
+- System Update Read
 
-# Usage Examples:
-
-#### Check for alerts. This may be all the average user needs to set up. TrueNAS/FreeNas alerts about nearly all significant events here.
-
-#### Alerts normal operation - username/password authentication
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -u root -p RootPassy --type alerts -nv
-OK - No problem alerts
-```
-
-#### Alerts normal operation - API Key authentication
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -p 1-weuiK4YY7OUduhpzKISIJJIDIJSJ4YgMwvea3dEhf3ITmoRRYZ3HBkDr2s1KZ1ft7M --type alerts -nv
-OK - No problem alerts
-```
-
-#### Alerts sample error condition
-```
-check_truenas_extended_play.py -H sicknas.yourdomain.local -u root -p RootPa$$worD -type alerts -nv -ns
-CRITICAL - (C) Space usage for pool "BigMediaThree" is 85%. Optimal pool performance requires
-used space remain below 80%. - (W) New feature flags are available for volume BigMediaToo. Refer
-to the "Upgrading a ZFS Pool" subsection in the User Guide "Installing and Upgrading" chapter
-and "Upgrading" section for more instructions. - (W) New feature flags are available for volume 
-BigMediaThree. Refer to the "Upgrading a ZFS Pool" subsection in the User Guide "Installing and Upgrading" 
-chapter and "Upgrading" section for more instructions.
-```
-
-## Check Zpool health
-
-#### Check all Zpools
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -u root -p RootPassy --type zpool -nv
-OK - No problem Zpools. Zpools examined:  ApolloZpoolOne ApolloZPoolEleven
-```
-
-#### Check a specifically named Zpool, ignoring any others
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -u root -p RootPassy --type zpool -nv --zpoolname ApolloZPoolEleven
-OK - No problem Zpools. Zpools examined:  ApolloZPoolEleven
-```
-
-#### Example of what happens if Zpool is not present
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -u root -p RootPassy --type zpool -nv --zpoolname PoolNameWhichIsNotActuallyThere
-CRITICAL - No Zpools found matching PoolNameWhichIsNotActuallyThere out of 2 pools (ApolloZpoolOne ApolloZPoolEleven)
-```
-
-## Check Zpool capacity
-
-#### Check all zpools for capacity issues
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -t zpool_capacity -p 1-weuiK4YY7OUdukdiejsijeiYFe4YgMwvea3dEhf3ITmoRRYZ3HBkDr2s1KZ1ft7M -nv 
-OK - No Zpool capacity issues. ZPools examined: ApolloZpoolOne (75.8% used) - ApolloZPoolEleven (64.0% used) - Root level datasets examined: ApolloZpoolOne ApolloZPoolEleven
-```
-Note that the default warning level (80%) and default critical level (90%) will be used here.
-
-#### Check specific zpool for capacity issues
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -t zpool_capacity -pn ApolloZpoolOne -p 1-weuiK4YY7OUdukdiejsijeiYFe4YgMwvea3dEhf3ITmoRRYZ3HBkDr2s1KZ1ft7M -nv 
-OK - No Zpool capacity issues. ZPools examined: ApolloZpoolOne (75.8% used) - Root level datasets examined: ApolloZpoolOne
-```
-
-#### Check all zpools with custom warning level
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -t zpool_capacity -zw 30 -p 1-weuiK4YY7OUdukdiejsijeiYFe4YgMwvea3dEhf3ITmoRRYZ3HBkDr2s1KZ1ft7M -nv 
-WARNING - Pool ApolloZpoolOne usage 75.8% exceeds warning value of 30% - Pool ApolloZPoolEleven usage 64.0% exceeds warning value of 30%
-```
-
-#### Check all zpools with custom error level
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -t zpool_capacity -zc 40 -p 1-weuiK4YY7OUdukdiejsijeiYFe4YgMwvea3dEhf3ITmoRRYZ3HBkDr2s1KZ1ft7M -nv 
-CRITICAL - Pool ApolloZpoolOne usage 75.8% exceeds warning value of 40% - Pool ApolloZPoolEleven usage 64.0% exceeds critical value of 40%
-```
-
-#### Check specific zpool for capacity issues, adding on perf data as well
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -t zpool_capacity -pn ApolloZpoolOne -zp -p 1-weuiK4YY7OUdukdiejsijeiYFe4YgMwvea3dEhf3ITmoRRYZ3HBkDr2s1KZ1ft7M -nv 
-OK - No Zpool capacity issues. ZPools examined: ApolloZpoolOne (75.8% used) - Root level datasets examined: ApolloZpoolOne;| ApolloZpoolOne=294202.30MB;310479.52;155239.76;0;388099.40
-```
-
-## Check replication health
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local -u root -p RootPassy --type repl -nv
-OK - No replication errors. Replications examined:  ApolloDatasetReplications: FINISHED
-```
-
-## Check for TrueNAS updates
-
-#### Check for TrueNAS updates - no updates available
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local --type update -p 1-weuiK4YY7OUduhpzKISIJJIDIJSJ4YgMwvea3dEhf3ITmoRRYZ3HBkDr2s1KZ1ft7M -nv
-OK - Update Status: UNAVAILABLE (no update available)
-```
-'UNAVAILABLE' is the normal update status, and does not indicate a problem.
-
-#### Check for TrueNAS updates - possible updates available
-```
-check_truenas_extended_play.py -H apollo.yourdomain.local --type update -p 1-weuiK4YY7OUduhpzKISIJJIDIJSJ4YgMwvea3dEhf3ITmoRRYZ3HBkDr2s1KZ1ft7M -nv
-WARNING - Update Status: AVAILABLE (an update is available). Update may be required. Go to TrueNAS Dashboard -> System -> Update to check for newer version.
-```
-
-All update issues are merely warnings, and not critical errors.
-
-As of 12/15/2021 there is an apparent issue with update checks when the ixsystems update servers are down, and the relevant API call crashes cryptically. I have filed a bug report with IX Systems:
-
-https://jira.ixsystems.com/browse/NAS-113833
+Using an API Key is preferred, however TrueNAS afaik does not allow the use of API Keys without SSL. If for some reason you can't use SSL, authenticate with user and password.
 
 # Version History
 
-*June 18, 2020 - Version 1.0*
+*May 17, 2026 - Version 2.0*
 
-Initial release. Script was not explicitly versioned - no version number displayed.
-
-*August 14, 2020 - Version 1.1*
-
-Replication check problems corrected. This check wasn't fully tested by author until this release.
-
-*December 3, 2021 - Version 1.2* 
-
-Added API Key authentication. Thanks to Folke Ashberg.
-
-*December 4, 2021 - Version 1.3* 
-
-Added update check, by request of @madtempest.
-
-*December 6, 2021 - Version 1.4*
-
-ZPool capacity check added.
-
-Thanks to both Folke Ashberg (@fashberg) and @Cosmits. Each made an independent pull request with a suggested implementation of the zpool capacity check feature, demonstrating a strong demand. It has been a bit involved to implement correctly, so if anyone sees free/used values for their ZPools that don't seem right, please let us know.
-
-*March 1, 2022 - Version 1.41*
-
-Adding well-intentioned but likely futile version check for Python 3.7 or greater. Clarifying in docs that Python 3.7 or greater is required.
-
-*January 30, 2023 - Version 1.42*
-
-@juleslink found a typo in a hardcoded byte count - "1204" instead of "1024" as it should have been. This caused incorrect byte math in capacity checks. Apologies for not seeing this earlier, and for any disruption this causes to your checks or metrics tracking!
-
-# Feedback Welcome
-If you have a suggestion or encounter a problem, I encourage users to get in touch. I've found half-baked Nagios plugins to be a chore to deal with, and I'd like this not to be one of them.
+Forked from https://github.com/StewLG/check_truenas_extended_play and updated to use the TrueNAS JSON-RPC 2.0 over WebSocket API.
