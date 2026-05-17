@@ -51,6 +51,6 @@ Using an API Key is preferred, however TrueNAS afaik does not allow the use of A
 
 # Version History
 
-*May 17, 2026 - Version 2.0*
+*17.06.2026 - Version 2.0*
 
-Forked from https://github.com/StewLG/check_truenas_extended_play and updated to use the TrueNAS JSON-RPC 2.0 over WebSocket API.
+Forked from https://github.com/StewLG/check_truenas_extended_play and updated to use the TrueNAS "JSON-RPC 2.0 over WebSocket" API.
