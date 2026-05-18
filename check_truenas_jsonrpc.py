@@ -333,6 +333,32 @@ class Startup(object):
         # API. If you know better, please let me know!
         #
         # -- SLG 12/04/2021
+        #
+        # TrueNAS JSON-RPC changed this a bit. It will always return all datasets as children of the root dataset AND on their own.
+        # So you get:
+        # 
+        #"result": [
+        #   {
+        #       "id": "pool-a",
+        #       "name": "pool-a",
+        #       "pool": "pool-a",
+        #       ...
+        #       "children": [
+        #           {
+        #               "id": "pool-a/dataset-x",
+        #               ...
+        #           }
+        #   },
+        #   {
+        #       "id:" "pool-a/dataset-x"
+        #       ...
+        #   }
+        #
+        #
+        # Checking if a dataset name equals its pool name <if (dataset['pool'] == dataset['name'])> fixes this. There should be a
+        # more elegant solution, but this works for now.
+        #
+        # -- Steffen 18.05.2026
 
 
         BYTES_IN_MEGABYTE = 1024 * 1024;
@@ -371,39 +397,40 @@ class Startup(object):
         zpoolNameToCapacityDict = {}
         
         try:
-            # Go through all the datasets, and sum up values for the zpools we are interested in
+            # Go through all the datasets where the dataset name equals the pool name (= root datasets), and sum up values for the zpools we are interested in
             for dataset in dataset_results:
-                root_level_dataset_count += 1
-                dataset_name = dataset['name']
-                dataset_pool_name = dataset['pool']
-                
-                all_root_level_dataset_names += dataset_name + ' '
-                
-                logging.debug('Checking root-level dataset for relevancy: dataset %s from pool %s', dataset_name, dataset_pool_name)
-                
-                # Either match all datasets, from any pool, or only datasets from the requested pool
-                if (looking_for_all_pools or self._zpool_name == dataset_pool_name):
-                    logging.debug('Relevant root-level dataset found: dataset %s from pool %s', dataset_name, dataset_pool_name)
-                    root_level_datasets_examined = root_level_datasets_examined + ' ' + dataset_name
-                    logging.debug('root_level_datasets_examined: %s', root_level_datasets_examined)
+                if (dataset['pool'] == dataset['name']):
+                    root_level_dataset_count += 1
+                    dataset_name = dataset['name']
+                    dataset_pool_name = dataset['pool']
 
-                    dataset_used_bytes = dataset['used']['parsed']
-                    dataset_available_bytes = dataset['available']['parsed']
+                    all_root_level_dataset_names += dataset_name + ' '
+                
+                    logging.debug('Checking root-level dataset for relevancy: dataset %s from pool %s', dataset_name, dataset_pool_name)
+                
+                    # Either match all datasets, from any pool, or only datasets from the requested pool
+                    if (looking_for_all_pools or self._zpool_name == dataset_pool_name):
+                        logging.debug('Relevant root-level dataset found: dataset %s from pool %s', dataset_name, dataset_pool_name)
+                        root_level_datasets_examined = root_level_datasets_examined + ' ' + dataset_name
+                        logging.debug('root_level_datasets_examined: %s', root_level_datasets_examined)
 
-                    logging.debug('dataset_used_bytes: %d', dataset_used_bytes)
-                    logging.debug('dataset_available_bytes: %d', dataset_available_bytes)
+                        dataset_used_bytes = dataset['used']['parsed']
+                        dataset_available_bytes = dataset['available']['parsed']
 
-                    # We haven't seen this Zpool before, starting new summary record about it
-                    if (not dataset_pool_name in zpoolNameToCapacityDict):
-                        # dataset_available_bytes is the same for any dataset in a zpool, so we can just use the first
-                        # one encountered. It will be the same value for all the relevant data sets, since they are all
-                        # in the same Zpool with the same amount of available space
-                        newZpoolCapacity = ZpoolCapacity(dataset_pool_name, dataset_available_bytes, dataset_used_bytes)
-                        zpoolNameToCapacityDict[dataset_pool_name] = newZpoolCapacity
-                    # Otherwise we've seen it before, update our count of used bytes
-                    else:
-                        zpoolNameToCapacityDict[dataset_pool_name].TotalUsedBytesForAllDatasets += dataset_used_bytes
-                    logging.debug('currentZpoolCapacity: ' + str(zpoolNameToCapacityDict[dataset_pool_name]))
+                        logging.debug('dataset_used_bytes: %d', dataset_used_bytes)
+                        logging.debug('dataset_available_bytes: %d', dataset_available_bytes)
+
+                        # We haven't seen this Zpool before, starting new summary record about it
+                        if (not dataset_pool_name in zpoolNameToCapacityDict):
+                            # dataset_available_bytes is the same for any dataset in a zpool, so we can just use the first
+                            # one encountered. It will be the same value for all the relevant data sets, since they are all
+                            # in the same Zpool with the same amount of available space
+                            newZpoolCapacity = ZpoolCapacity(dataset_pool_name, dataset_available_bytes, dataset_used_bytes)
+                            zpoolNameToCapacityDict[dataset_pool_name] = newZpoolCapacity
+                        # Otherwise we've seen it before, update our count of used bytes
+                        else:
+                            zpoolNameToCapacityDict[dataset_pool_name].TotalUsedBytesForAllDatasets += dataset_used_bytes
+                        logging.debug('currentZpoolCapacity: ' + str(zpoolNameToCapacityDict[dataset_pool_name]))
 
 
             # So now we have summary data on all the Zpools we care about. Go through each of them 
