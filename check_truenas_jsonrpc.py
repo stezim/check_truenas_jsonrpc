@@ -132,12 +132,20 @@ class Startup(object):
                 }))
             ws.recv()
 
-            payload=(json.dumps({
+            if (options == None):
+                payload=(json.dumps({
                 'jsonrpc': '2.0',
                 'method': resource,
-                'params': options,
+                'params': [],
                 'id': 1
             }))
+            else:
+                payload=(json.dumps({
+                    'jsonrpc': '2.0',
+                    'method': resource,
+                    'params': options,
+                    'id': 1
+                }))
             #print(f"{payload}")
             ws.send(payload)
             r = json.loads(ws.recv())
@@ -155,7 +163,7 @@ class Startup(object):
             sys.exit(3)
 
     def check_repl(self):
-        repls = self.do_request('replication.query')
+        repls = self.do_request('replication.query', None)
         errors=0
         msg=''
         replications_examined = ''
@@ -190,7 +198,7 @@ class Startup(object):
 
 
     def check_update(self):
-        updateCheckResult = self.do_request('update.status')
+        updateCheckResult = self.do_request('update.status', None)
         warnings=0
         errors=0
         msg=''
@@ -228,7 +236,7 @@ class Startup(object):
             sys.exit(0)
 
     def check_alerts(self):
-        alerts = self.do_request('alert.list')
+        alerts = self.do_request('alert.list', None)
         
         logging.debug('alerts: %s', alerts)
         
@@ -263,7 +271,7 @@ class Startup(object):
             sys.exit(0)
  
     def check_zpool(self):
-        pool_results = self.do_request('pool.query')
+        pool_results = self.do_request('pool.query', None)
 
         #logging.debug('pool_results: %s', pool_results)
         
