@@ -46,7 +46,11 @@ import sys
 # Sorry I can't do more without deliberately avoding language features!
 #
 # -- SLG 3/1/2022
-MIN_PYTHON = (3, 7)
+#
+# Bumped minimum required Python version to 3.10, because websockets requires it.
+#
+# -- Steffen 20.05.2026
+MIN_PYTHON = (3, 10)
 if sys.version_info < MIN_PYTHON:
     sys.exit("Python %s.%s or later is required.\n" % MIN_PYTHON)
 
@@ -99,8 +103,6 @@ class Startup(object):
         logging.debug('cfree: %d', self._cfree)
         logging.debug('')
  
-
-    # Do a GET or POST request
     def do_request(self, resource, options):
         try:
             request_url = self._base_url
