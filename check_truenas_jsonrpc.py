@@ -67,7 +67,7 @@ class ZpoolCapacity:
 
 class Startup(object):
 
-    def __init__(self, hostname, user, secret, use_ssl, verify_cert, ignore_dismissed_alerts, debug_logging, zpool_name, zpool_warn, zpool_critical, show_zpool_perfdata):
+    def __init__(self, hostname, user, secret, use_ssl, verify_cert, ignore_dismissed_alerts, debug_logging, zpool_name, zpool_warn, zpool_critical, show_zpool_perfdata, temperature_name, temperature_warn, temperature_critical, show_temperature_perfdata):
         self._hostname = hostname
         self._user = user
         self._secret = secret
@@ -80,6 +80,10 @@ class Startup(object):
         self._wfree = zpool_warn
         self._cfree = zpool_critical
         self._show_zpool_perfdata = show_zpool_perfdata
+        self._temperature_name = temperature_name
+        self._temperature_warn = temperature_warn
+        self._temperature_critical = temperature_critical
+        self._show_temperature_perfdata = show_temperature_perfdata
  
         ws_request_header = 'wss' if use_ssl else 'ws'
  
@@ -95,6 +99,9 @@ class Startup(object):
         logging.debug('verify_cert: %s', self._verify_cert)
         logging.debug('base_url: %s', self._base_url)
         logging.debug('zpool_name: %s', self._zpool_name)
+        logging.debug('temperature_name: %s', self._temperature_name)
+        logging.debug('temperature_warn: %d', self._temperature_warn)
+        logging.debug('temperature_critical: %d', self._temperature_critical)
         logging.debug('wfree: %d', self._wfree)
         logging.debug('cfree: %d', self._cfree)
         logging.debug('')
@@ -259,7 +266,75 @@ class Startup(object):
         else:
             print ('OK - No problem alerts')
             sys.exit(0)
- 
+            
+    def check_temperatures(self):
+        temperatures = self.do_request('disk.temperatures')
+
+        warn_threshold = self._temperature_warn
+        crit_threshold = self._temperature_critical
+
+        warn = 0
+        crit = 0
+        critical_messages = ''
+        warning_messages = ''
+        disks_examined = ''
+        perfdata = ''
+        output_perfdata = ''
+        all_disk_names = ''
+        actual_disk_count = 0
+
+        all_disks = self._temperature_name.lower() == 'all'
+
+        try:
+            for disk_name in sorted(temperatures.keys()):
+                actual_disk_count += 1
+                all_disk_names += disk_name + ' '
+
+                if not all_disks and disk_name != self._temperature_name:
+                    continue
+
+                temp = temperatures[disk_name]
+                logging.debug('Disk %s temperature: %s', disk_name, temp)
+                if temp is None:
+                    if all_disks:
+                        continue
+                    crit += 1
+                    critical_messages += '- (C) ' + disk_name + ': no temperature reading '
+                    continue
+                temp_display = f'{temp:.2f}' if isinstance(temp, float) else str(temp)
+                disks_examined += ' ' + disk_name + ': ' + temp_display + 'C'
+                if self._show_temperature_perfdata:
+                    perfdata += ' ' + disk_name + '=' + temp_display + 'C;' + str(warn_threshold) + ';' + str(crit_threshold) + ';0;100'
+                if temp >= crit_threshold:
+                    crit += 1
+                    critical_messages += '- (C) ' + disk_name + ': ' + temp_display + 'C '
+                elif temp >= warn_threshold:
+                    warn += 1
+                    warning_messages += '- (W) ' + disk_name + ': ' + temp_display + 'C '
+        except:
+            print ('UNKNOWN - check_temperatures() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
+            sys.exit(3)
+
+        if disks_examined == '' and not all_disks and crit == 0 and warn == 0:
+            crit += 1
+            if actual_disk_count > 0:
+                critical_messages = '- No disk found matching {} out of {} disks ({})'.format(self._temperature_name, actual_disk_count, all_disk_names.strip())
+            else:
+                critical_messages = '- No disk found matching {} (no disks reported by server)'.format(self._temperature_name)
+
+        if self._show_temperature_perfdata:
+            output_perfdata = ' |' + perfdata
+
+        if crit > 0:
+            print ('CRITICAL ' + critical_messages + warning_messages + disks_examined + output_perfdata)
+            sys.exit(2)
+        elif warn > 0:
+            print ('WARNING ' + warning_messages + disks_examined + output_perfdata)
+            sys.exit(1)
+        else:
+            print ('OK - No disk temperature issues. Disks examined:' + disks_examined + output_perfdata)
+            sys.exit(0)
+
     def check_zpool(self):
         pool_results = self.do_request('pool.query')
 
@@ -359,6 +434,10 @@ class Startup(object):
         # more elegant solution, but this works for now.
         #
         # -- Steffen 18.05.2026
+        # 
+        # indeed, its possible to do this in a more elegant way using query-options. We can use them to not query any children, so we wouldn't have to do that comparison. 
+        #
+        # -- mordi 20.05.2026       
 
 
         BYTES_IN_MEGABYTE = 1024 * 1024;
@@ -523,6 +602,8 @@ class Startup(object):
             self.check_zpool()
         elif alert_type == 'zpool_capacity':
             self.check_zpool_capacity()
+        elif alert_type == 'temperatures':
+            self.check_temperatures()
         else:
             print ("Unknown type: " + alert_type)
             sys.exit(3)
@@ -541,6 +622,8 @@ check_truenas_script_version = '2.0'
 
 default_zpool_warning_percent = 80
 default_zool_critical_percent = 90
+default_temperature_warning = 50
+default_temperature_critical = 60
 
 def main():
     # Build parser for arguments
@@ -548,16 +631,20 @@ def main():
     parser.add_argument('-H', '--hostname', required=True, type=str, help='Hostname or IP address')
     parser.add_argument('-u', '--user', required=False, type=str, help='Username, if not specified: use API Key')
     parser.add_argument('-p', '--passwd', required=True, type=str, help='Password or API Key')
-    parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, or update')
+    parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, update, or temperatures')
     parser.add_argument('-pn', '--zpoolname', required=False, type=str, default='all', help='For check type zpool, the name of zpool to check. Optional; defaults to all zpools.')
+    parser.add_argument('-tn', '--temperaturename', required=False, type=str, default='all', help='For check type temperatures, the disk device name to check (e.g. sda, nvme0n1). Optional; defaults to all disks.')
     parser.add_argument('-ns', '--no-ssl', required=False, action='store_true', help='Disable SSL (use WS); default is to use SSL (use WSS)')
     parser.add_argument('-nv', '--no-verify-cert', required=False, action='store_true', help='Do not verify the server SSL cert; default is to verify the SSL cert')
     parser.add_argument('-ig', '--ignore-dismissed-alerts', required=False, action='store_true', help='Ignore alerts that have already been dismissed in FreeNas/TrueNAS; default is to treat them as relevant')
     parser.add_argument('-d', '--debug', required=False, action='store_true', help='Display debugging information; run script this way and record result when asking for help.')
     parser.add_argument('-zw', '--zpool-warn', required=False, type=int, default=default_zpool_warning_percent, help='ZPool warning storage capacity free threshold. Give a percent value in the range 1-100, defaults to ' + str(default_zpool_warning_percent) + '%%. Used with zpool_capacity check.')    
     parser.add_argument('-zc', '--zpool-critical', required=False, type=int, default=default_zool_critical_percent, help='ZPool critical storage capacity free threshold. Give a percent value in the range 1-100, defaults to ' + str(default_zool_critical_percent) +'%%. Used with zpool_capacity check.')
-    parser.add_argument('-zp', '--zpool-perfdata', required=False, action='store_true', help='Add Zpool capacity perf data to output. Used with zpool_capacity check.')    
-    
+    parser.add_argument('-zp', '--zpool-perfdata', required=False, action='store_true', help='Add Zpool capacity perf data to output. Used with zpool_capacity check.')
+    parser.add_argument('-tw', '--temperature-warning', required=False, type=int, default=default_temperature_warning, help='Disk temperature warning threshold in degrees C, defaults to ' + str(default_temperature_warning) + '. Used with temperatures check.')
+    parser.add_argument('-tc', '--temperature-critical', required=False, type=int, default=default_temperature_critical, help='Disk temperature critical threshold in degrees C, defaults to ' + str(default_temperature_critical) + '. Used with temperatures check.')
+    parser.add_argument('-tp', '--temperature-perfdata', required=False, action='store_true', help='Add disk temperature perf data to output. Used with temperatures check.')
+
     # if no arguments, print out help
     if len(sys.argv)==1:
         parser.print_help(sys.stderr)
@@ -569,7 +656,7 @@ def main():
     use_ssl = not args.no_ssl
     verify_ssl_cert = not args.no_verify_cert
  
-    startup = Startup(args.hostname, args.user, args.passwd, use_ssl, verify_ssl_cert, args.ignore_dismissed_alerts, args.debug, args.zpoolname, args.zpool_warn, args.zpool_critical, args.zpool_perfdata)
+    startup = Startup(args.hostname, args.user, args.passwd, use_ssl, verify_ssl_cert, args.ignore_dismissed_alerts, args.debug, args.zpoolname, args.zpool_warn, args.zpool_critical, args.zpool_perfdata, args.temperaturename, args.temperature_warning, args.temperature_critical, args.temperature_perfdata)
  
     startup.handle_requested_alert_type(args.type)
  
