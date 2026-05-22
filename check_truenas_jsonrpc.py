@@ -280,7 +280,7 @@ class Startup(object):
             sys.exit(0)
             
     def check_temperatures(self):
-        temperatures = self.do_request('disk.temperatures')
+        temperatures = self.do_request('disk.temperatures', None)
 
         warn_threshold = self._temperature_warn
         crit_threshold = self._temperature_critical
