@@ -8,7 +8,7 @@ Feel free to open an issue for bugs, improvements or feature requests.
 ```
 usage: check_truenas_jsonrpc.py [-h] -H HOSTNAME [-u USER] -p PASSWD -t TYPE [-pn ZPOOLNAME] [-ns] [-nv] [-ig] [-d] [-zw ZPOOL_WARN] [-zc ZPOOL_CRITICAL] [-zp]
 
-Checks a TrueNAS server using the JSON-RPC 2.0 over WebSocket API. Version 2.0
+Checks a TrueNAS server using the JSON-RPC 2.0 over WebSocket API. Version 2.1
 
 options:
   -h, --help            show this help message and exit
@@ -54,3 +54,7 @@ Using an API Key is preferred, however TrueNAS afaik does not allow the use of A
 *17.06.2026 - Version 2.0*
 
 Forked from https://github.com/StewLG/check_truenas_extended_play and updated to use the TrueNAS "JSON-RPC 2.0 over WebSocket" API.
+
+*20.06.2026 - Version 2.1*
+
+Added support for API query filters and options. Reworked check_zpool_capacity to use API query filters and options.
