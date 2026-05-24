@@ -287,14 +287,14 @@ class Startup(object):
             print ('OK - No problem alerts')
             sys.exit(0)
             
-    def check_temperatures(self):
+    def check_disk_temps(self):
         temperatures = self.do_request('disk.temperatures', None)
 
         if (self._warn == None):
             self._warn = 45
         if (self._crit == None):
             self._crit = 55
-            
+
         warn_threshold = self._warn
         crit_threshold = self._crit
 
@@ -337,7 +337,7 @@ class Startup(object):
                     warn += 1
                     warning_messages += '- (W) ' + disk_name + ': ' + temp_display + 'C '
         except:
-            print ('UNKNOWN - check_temperatures() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
+            print ('UNKNOWN - check_disk_temps() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
             sys.exit(3)
 
         if disks_examined == '' and not all_disks and crit == 0 and warn == 0:
@@ -586,8 +586,8 @@ class Startup(object):
             self.check_zpool()
         elif alert_type == 'zpool_capacity':
             self.check_zpool_capacity()
-        elif alert_type == 'temperatures':
-            self.check_temperatures()
+        elif alert_type == 'disk_temps':
+            self.check_disk_temps()
         else:
             print ("Unknown type: " + alert_type)
             sys.exit(3)
@@ -610,7 +610,7 @@ def main():
     parser.add_argument('-H', '--hostname', required=True, type=str, help='Hostname or IP address')
     parser.add_argument('-u', '--user', required=False, type=str, help='Username, if not specified: use API Key')
     parser.add_argument('-p', '--passwd', required=True, type=str, help='Password or API Key')
-    parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, update, or temperatures')
+    parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, update, or disk_temps')
     parser.add_argument('-pn', '--zpoolname', required=False, type=str, default='all', help='For compatibility with older version of this plugin. Same as --name.')
     parser.add_argument('-n', '--name', required=False, type=str, default='all', help='Resource name (e.g. disk name, pool name). Optional.')
     parser.add_argument('-ns', '--no-ssl', required=False, action='store_true', help='Disable SSL (use WS); default is to use SSL (use WSS)')
