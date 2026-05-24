@@ -56,7 +56,6 @@ if sys.version_info < MIN_PYTHON:
 
 import json
 import ssl
-import sys
 import argparse
 import logging
 from websockets.sync.client import connect
@@ -111,9 +110,6 @@ class Startup(object):
         logging.debug('verify_cert: %s', self._verify_cert)
         logging.debug('base_url: %s', self._base_url)
         logging.debug('name: %s', self._name)
-        logging.debug('temperature_name: %s', self._name)
-        logging.debug('temperature_warn: %d', self._warn)
-        logging.debug('temperature_critical: %d', self._crit)
         logging.debug('warn: %d', self._warn)
         logging.debug('crit: %d', self._crit)
         logging.debug('')
@@ -602,7 +598,7 @@ class Startup(object):
             #print('Should be setting no logging level at all')
             logger.setLevel(logging.CRITICAL)
 
-check_truenas_script_version = '2.1'
+check_truenas_script_version = '2.2'
 
 def main():
     # Build parser for arguments
