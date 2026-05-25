@@ -731,7 +731,7 @@ class Startup(object):
             sys.exit(3)
 
         if crit > 0:
-            print ('CRITICAL ' + critical_messages + warning_messages + perfdata)
+            print ('CRITICAL ' + critical_messages + perfdata)
             sys.exit(2)
         elif warn > 0:
             print ('WARNING ' + warning_messages + perfdata)
@@ -739,6 +739,68 @@ class Startup(object):
         else:
             print ('OK - No load issues.' + perfdata)
             sys.exit(0)
+
+    def check_memory(self):
+
+        # This memory check might not be useful at all, since TrueNAS always tries to fill most free memory with
+        # ZFS caching data. Therefore the memory is always almost full. I could not find a way query TrueNAS for 
+        # used memory minus ZFS cache or available memory plus ZFS cache or something else that makes more sense.
+        # They definitely have that data somewhere since it is displayed in one of the default dashboard wigets.
+        # 
+        # Because of this the default values for warnings and criticals are quiet high.  
+
+        logging.debug('check_memory')
+
+        if (self._warn == None):
+            self._warn = 95
+        if (self._crit == None):
+            self._crit = 98
+        
+        warn_threshold = self._warn
+        crit_threshold = self._crit
+        
+        warn=0
+        crit=0
+        critical_messages = ''
+        warning_messages = ''
+        perfdata = ''
+        if (self._perfdata):
+            perfdata= ';|'
+
+        queryOptions = (
+            [
+                [{'name': 'memory', 'identifier': None}],
+                {'aggregate': True, 'start': int(time.time()-15)}
+            ]
+        )
+
+        try:
+            #we need to query the target twice, because reporting.get_data only returns used memory and not total and/or used.
+            free_memory = self.do_request('reporting.get_data', queryOptions)
+            total_memory = self.do_request('system.info', None)
+
+            used_memory = (total_memory['physmem'] - free_memory[0]['aggregations']['min']['available'])
+            used_memory_percent = (used_memory / total_memory['physmem'] * 100)
+            used_memory_percent_display = f'{used_memory_percent:.2f}'
+
+            perfdata += ' memory=' + used_memory_percent_display + ';' + str(warn_threshold) + ';' + str(crit_threshold) + ';0;100'
+
+        except:
+            print ('UNKNOWN - check_memory() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
+            sys.exit(3)    
+
+        if (used_memory_percent > crit_threshold):
+            critical_messages = '- (C) Memory useage is ' + used_memory_percent_display + '%'
+            print ('CRITICAL ' + critical_messages + perfdata)
+            sys.exit(2)
+        elif (used_memory_percent > warn_threshold):
+            warning_messages = '- (W) Memory useage is ' + used_memory_percent_display + '%'
+            print ('WARNING ' + warning_messages + perfdata)
+            sys.exit(1)   
+        else:
+            print ('OK - No memory issues.' + perfdata)
+            sys.exit(0)
+     
 
     def handle_requested_alert_type(self, alert_type):
         if alert_type == 'alerts':
@@ -757,6 +819,8 @@ class Startup(object):
             self.check_cpu_temps()
         elif alert_type == 'load':
             self.check_load()
+        elif alert_type == 'memory':
+            self.check_memory()
         else:
             print ("Unknown type: " + alert_type)
             sys.exit(3)

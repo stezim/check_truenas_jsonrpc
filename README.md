@@ -45,6 +45,7 @@ options:
 # Authentication
 I recommend setting up a read-only user for monitoring with the following privileges:
 
+- Readonly Admin
 - Alert Read
 - Dataset Read
 - Pool Read
