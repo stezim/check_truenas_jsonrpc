@@ -742,19 +742,15 @@ class Startup(object):
 
     def check_memory(self):
 
-        # This memory check might not be useful at all, since TrueNAS always tries to fill most free memory with
-        # ZFS caching data. Therefore the memory is always almost full. I could not find a way query TrueNAS for 
-        # used memory minus ZFS cache or available memory plus ZFS cache or something else that makes more sense.
-        # They definitely have that data somewhere since it is displayed in one of the default dashboard wigets.
-        # 
-        # Because of this the default values for warnings and criticals are quiet high.  
+        # This memory check might not be the most accurate. I've tried to calculate the used memory by subtracting
+        # available memory and memory used for ZFS caching (ARC) from the total amount of memory. 
 
         logging.debug('check_memory')
 
         if (self._warn == None):
-            self._warn = 95
+            self._warn = 80
         if (self._crit == None):
-            self._crit = 98
+            self._crit = 90
         
         warn_threshold = self._warn
         crit_threshold = self._crit
@@ -767,23 +763,34 @@ class Startup(object):
         if (self._perfdata):
             perfdata= ';|'
 
-        queryOptions = (
+        queryOptions1 = (
             [
                 [{'name': 'memory', 'identifier': None}],
                 {'aggregate': True, 'start': int(time.time()-15)}
             ]
         )
 
+        queryOptions2 = (
+            [
+                [{'name': 'arcsize', 'identifier': None}],
+                {'aggregate': True, 'start': int(time.time()-15)}
+            ]
+        )
+
         try:
-            #we need to query the target twice, because reporting.get_data only returns used memory and not total and/or used.
-            free_memory = self.do_request('reporting.get_data', queryOptions)
+            # We need to query the target twice for memory, because reporting.get_data only returns used memory and 
+            # not total and/or used.
+            # We also need to query it once more for the ZFS cache size, since the ZFS cache is not included in
+            # available memory even though it is technically available. 
+            free_memory = self.do_request('reporting.get_data', queryOptions1)
+            zfs_cache = self.do_request('reporting.get_data', queryOptions2)
             total_memory = self.do_request('system.info', None)
 
-            used_memory = (total_memory['physmem'] - free_memory[0]['aggregations']['min']['available'])
+            used_memory = (total_memory['physmem'] - free_memory[0]['aggregations']['min']['available'] - zfs_cache[0]['aggregations']['min']['size'])
             used_memory_percent = (used_memory / total_memory['physmem'] * 100)
             used_memory_percent_display = f'{used_memory_percent:.2f}'
-
-            perfdata += ' memory=' + used_memory_percent_display + ';' + str(warn_threshold) + ';' + str(crit_threshold) + ';0;100'
+            if (self._perfdata):
+                perfdata += ' memory=' + used_memory_percent_display + ';' + str(warn_threshold) + ';' + str(crit_threshold) + ';0;100'
 
         except:
             print ('UNKNOWN - check_memory() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
