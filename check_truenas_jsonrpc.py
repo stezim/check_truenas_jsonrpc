@@ -58,6 +58,7 @@ import json
 import ssl
 import argparse
 import logging
+import time
 from websockets.sync.client import connect
 from dataclasses import dataclass
 
@@ -208,7 +209,6 @@ class Startup(object):
         else:
             print ('OK - No replication errors. Replications examined: ' + replications_examined)
             sys.exit(0)
-
 
     def check_update(self):
         updateCheckResult = self.do_request('update.status', None)
@@ -571,6 +571,103 @@ class Startup(object):
             print ('OK - No Zpool capacity issues. ZPools examined: ' + zpools_examined_with_no_issues + ' - Root level datasets examined:' + root_level_datasets_examined + perfdata)
             sys.exit(0)
 
+    def check_cpu_temps(self):
+
+        logging.debug('check_cpu_temps')
+        
+        if (self._warn == None):
+            self._warn = 80
+        if (self._crit == None):
+            self._crit = 90
+        
+        warn_threshold = self._warn
+        crit_threshold = self._crit
+        
+        warn=0
+        crit=0
+        critical_messages = ''
+        warning_messages = ''
+        cpus_examined_with_no_issues = ''
+        cpus_examined = ''
+        cpu_count = 0
+        all_cpu_names = ''
+        perfdata = ''
+        if (self._perfdata):
+            perfdata= ';|'
+
+        all_cpus = self._name.lower() == 'all'
+
+        #We query for all cpus since TrueNAS seems to ignore the identifier for this query.
+        queryOptions = (
+            [
+                [{'name': 'cputemp', 'identifier': None}],
+                {'aggregate': True, 'start': int(time.time()-5)}
+            ]
+        )
+        temperatures = self.do_request('reporting.get_data', queryOptions)
+
+        #Check if we received any temperatures. If TrueNAS is installed in a VM, it might not report CPU temperatures.
+        try:
+            temperatures[0]['aggregations']['mean'][cpu_count]
+        except:
+            print ('UNKNOWN - check_cpu_temps() - No temperatures received: ' + str(sys.exc_info()))
+            sys.exit(3)
+
+        try:
+            for cpu_name in temperatures[0]['legend']:
+                if (cpu_name == 'time'):
+                    continue
+                cpu_count += 1
+                all_cpu_names += cpu_name + ' '
+                if not all_cpus and cpu_name != self._name:
+                    continue
+                
+                try:
+                    temp = temperatures[0]['aggregations']['mean'][cpu_count]
+                except:
+                    print ('UNKNOWN - check_cpu_temps() - No temperatures received: ' + str(sys.exc_info()))
+                    sys.exit(3)
+                logging.debug('CPU %s temperature: %s', cpu_name, temp)
+                if temp is None:
+                    if all_cpus:
+                        continue
+                    crit += 1
+                    critical_messages += '- (C) ' + cpu_name + ': no temperature reading '
+                    continue
+                temp_display = f'{temp:.2f}' if isinstance(temp, float) else str(temp)
+                cpus_examined += ' ' + cpu_name + ': ' + temp_display + 'C'
+                if self._perfdata:
+                    perfdata += ' ' + cpu_name + '=' + temp_display + 'C;' + str(warn_threshold) + ';' + str(crit_threshold) + ';0;100'
+                if temp >= crit_threshold:
+                    crit += 1
+                    critical_messages += '- (C) ' + cpu_name + ': ' + temp_display + 'C '
+                elif temp >= warn_threshold:
+                    warn += 1
+                    warning_messages += '- (W) ' + cpu_name + ': ' + temp_display + 'C '
+        except:
+            print ('UNKNOWN - check_cpu_temps() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
+            sys.exit(3)
+
+        if cpus_examined == '' and not all_cpus and crit == 0 and warn == 0:
+            crit += 1
+            if actual_disk_count > 0:
+                critical_messages = '- No CPU found matching {} out of {} CPUs ({})'.format(self._name, cpu_count, all_cpu_names.strip())
+            else:
+                critical_messages = '- No CPU found matching {} (no CPUs reported by server)'.format(self._name)
+
+        if self._perfdata:
+            output_perfdata = ' |' + perfdata
+
+        if crit > 0:
+            print ('CRITICAL ' + critical_messages + warning_messages + cpus_examined + output_perfdata)
+            sys.exit(2)
+        elif warn > 0:
+            print ('WARNING ' + warning_messages + cpus_examined + output_perfdata)
+            sys.exit(1)
+        else:
+            print ('OK - No disk temperature issues. CPUs examined:' + cpus_examined + output_perfdata)
+            sys.exit(0)
+
     def handle_requested_alert_type(self, alert_type):
         if alert_type == 'alerts':
             self.check_alerts()
@@ -584,6 +681,8 @@ class Startup(object):
             self.check_zpool_capacity()
         elif alert_type == 'disk_temps':
             self.check_disk_temps()
+        elif alert_type == 'cpu_temps':
+            self.check_cpu_temps()
         else:
             print ("Unknown type: " + alert_type)
             sys.exit(3)
@@ -606,7 +705,7 @@ def main():
     parser.add_argument('-H', '--hostname', required=True, type=str, help='Hostname or IP address')
     parser.add_argument('-u', '--user', required=False, type=str, help='Username, if not specified: use API Key')
     parser.add_argument('-p', '--passwd', required=True, type=str, help='Password or API Key')
-    parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, update, or disk_temps')
+    parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, update, disk_temps, cpu_temps, (load, memory)')
     parser.add_argument('-pn', '--zpoolname', required=False, type=str, default='all', help='For compatibility with older version of this plugin. Same as --name.')
     parser.add_argument('-n', '--name', required=False, type=str, default='all', help='Resource name (e.g. disk name, pool name). Optional.')
     parser.add_argument('-ns', '--no-ssl', required=False, action='store_true', help='Disable SSL (use WS); default is to use SSL (use WSS)')
