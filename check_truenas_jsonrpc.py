@@ -665,7 +665,79 @@ class Startup(object):
             print ('WARNING ' + warning_messages + cpus_examined + output_perfdata)
             sys.exit(1)
         else:
-            print ('OK - No disk temperature issues. CPUs examined:' + cpus_examined + output_perfdata)
+            print ('OK - No CPU temperature issues. CPUs examined:' + cpus_examined + output_perfdata)
+            sys.exit(0)
+
+    def check_load(self):
+
+        logging.debug('check_load')
+        
+        if (self._warn == None):
+            self._warn = 5
+        if (self._crit == None):
+            self._crit = 10
+        
+        warn_threshold = self._warn
+        crit_threshold = self._crit
+        
+        warn=0
+        crit=0
+        critical_messages = ''
+        warning_messages = ''
+        perfdata = ''
+        if (self._perfdata):
+            perfdata= ';|'
+
+        queryOptions = (
+            [
+                [{'name': 'load', 'identifier': None}],
+                {'aggregate': True, 'start': int(time.time()-15)}
+            ]
+        )
+        load = self.do_request('reporting.get_data', queryOptions)
+
+        try:
+
+            shortterm_display = f'{load[0]['aggregations']['max']['shortterm']:.2f}'
+            midterm_display = f'{load[0]['aggregations']['max']['midterm']:.2f}'
+            longterm_display = f'{load[0]['aggregations']['max']['longterm']:.2f}'
+
+            if self._perfdata:
+                perfdata += ' load1=' + shortterm_display + ';' + str(warn_threshold) + ';' + str(crit_threshold) + ';0;'
+                perfdata += ' load5=' + midterm_display + ';' + str(warn_threshold) + ';' + str(crit_threshold) + ';0;'
+                perfdata += ' load15=' + longterm_display + ';' + str(warn_threshold) + ';' + str(crit_threshold) + ';0;'
+
+            if (load[0]['aggregations']['max']['shortterm'] > crit_threshold):
+                crit += 1
+                critical_messages += '- (C) load1: ' + shortterm_display
+            elif (load[0]['aggregations']['max']['shortterm'] > warn_threshold):
+                warn += 1
+                warning_messages += '- (W) load1: ' + shortterm_display
+            if (load[0]['aggregations']['max']['midterm'] > crit_threshold):
+                crit += 1
+                critical_messages += '- (C) load5: ' + midterm_display
+            elif (load[0]['aggregations']['max']['midterm'] > warn_threshold):
+                warn += 1
+                warning_messages += '- (W) load5: ' + midterm_display
+            if (load[0]['aggregations']['max']['longterm'] > crit_threshold):
+                crit += 1
+                critical_messages += '- (C) load15: ' + longterm_display
+            elif (load[0]['aggregations']['max']['longterm'] > warn_threshold):
+                warn += 1
+                warning_messages += '- (W) load15: ' + longterm_display
+
+        except:
+            print ('UNKNOWN - check_load() - Error when contacting TrueNAS server: ' + str(sys.exc_info()))
+            sys.exit(3)
+
+        if crit > 0:
+            print ('CRITICAL ' + critical_messages + warning_messages + perfdata)
+            sys.exit(2)
+        elif warn > 0:
+            print ('WARNING ' + warning_messages + perfdata)
+            sys.exit(1)
+        else:
+            print ('OK - No load issues.' + perfdata)
             sys.exit(0)
 
     def handle_requested_alert_type(self, alert_type):
@@ -683,6 +755,8 @@ class Startup(object):
             self.check_disk_temps()
         elif alert_type == 'cpu_temps':
             self.check_cpu_temps()
+        elif alert_type == 'load':
+            self.check_load()
         else:
             print ("Unknown type: " + alert_type)
             sys.exit(3)
