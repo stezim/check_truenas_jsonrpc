@@ -104,6 +104,16 @@ class Startup(object):
         self.setup_logging()
         self.log_startup_information()
 
+        if (self._verify_cert == False):
+            self._ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            self._ssl_context.check_hostname = False
+            self._ssl_context.verify_mode = ssl.CERT_NONE
+
+        if (self._use_ssl == False):
+            self._ws = connect(self._base_url)
+        else:
+            self._ws = connect(self._base_url, ssl=self._ssl_context)      
+
     def log_startup_information(self):
         logging.debug('')
         logging.debug('hostname: %s', self._hostname)
@@ -119,32 +129,22 @@ class Startup(object):
         try:
             request_url = self._base_url
             logging.debug('request_url: %s', request_url)
-            
-            if (self._verify_cert == False):
-                self._ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-                self._ssl_context.check_hostname = False
-                self._ssl_context.verify_mode = ssl.CERT_NONE
-            
-            if (self._use_ssl == False):
-                ws = connect(request_url)
-            else:
-                ws = connect(request_url, ssl=self._ssl_context)
 
             if (self._user):
-                ws.send(json.dumps({
+                self._ws.send(json.dumps({
                     'jsonrpc': '2.0',
                     'method': 'auth.login',
                     'params': [self._user, self._secret],
                     'id': 1
                 }))
             else:
-                ws.send(json.dumps({
+                self._ws.send(json.dumps({
                     'jsonrpc': '2.0',
                     'method': 'auth.login_with_api_key',
                     'params': [self._secret],
                     'id': 1
                 }))
-            ws.recv()
+            self._ws.recv()
 
             if (options == None):
                 payload=(json.dumps({
@@ -161,8 +161,8 @@ class Startup(object):
                     'id': 1
                 }))
             #print(f"{payload}")
-            ws.send(payload)
-            r = json.loads(ws.recv())
+            self._ws.send(payload)
+            r = json.loads(self._ws.recv())
             #print(f"{r}")
             return r.get("result")
         except:
