@@ -591,6 +591,7 @@ class Startup(object):
         cpus_examined = ''
         cpu_count = 0
         all_cpu_names = ''
+        output_perfdata = ''
         perfdata = ''
         if (self._perfdata):
             perfdata= ';|'
@@ -608,22 +609,19 @@ class Startup(object):
 
         #Check if we received any temperatures. If TrueNAS is installed in a VM, it might not report CPU temperatures.
         try:
-            temperatures[0]['aggregations']['mean'][cpu_count]
+            temperatures[0]['aggregations']['mean']['cpu']
         except:
             print ('UNKNOWN - check_cpu_temps() - No temperatures received: ' + str(sys.exc_info()))
             sys.exit(3)
 
         try:
-            for cpu_name in temperatures[0]['legend']:
-                if (cpu_name == 'time'):
-                    continue
-                cpu_count += 1
+            for cpu_name in temperatures[0]['aggregations']['mean']:
                 all_cpu_names += cpu_name + ' '
                 if not all_cpus and cpu_name != self._name:
                     continue
                 
                 try:
-                    temp = temperatures[0]['aggregations']['mean'][cpu_count]
+                    temp = temperatures[0]['aggregations']['mean'][cpu_name]
                 except:
                     print ('UNKNOWN - check_cpu_temps() - No temperatures received: ' + str(sys.exc_info()))
                     sys.exit(3)
