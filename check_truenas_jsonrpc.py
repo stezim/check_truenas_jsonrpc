@@ -300,7 +300,9 @@ class Startup(object):
         warning_messages = ''
         disks_examined = ''
         perfdata = ''
-        output_perfdata = ''
+        if (self._perfdata):
+            perfdata= ';|'
+            
         all_disk_names = ''
         actual_disk_count = 0
 
@@ -343,17 +345,14 @@ class Startup(object):
             else:
                 critical_messages = '- No disk found matching {} (no disks reported by server)'.format(self._name)
 
-        if self._perfdata:
-            output_perfdata = ' |' + perfdata
-
         if crit > 0:
-            print ('CRITICAL ' + critical_messages + warning_messages + disks_examined + output_perfdata)
+            print ('CRITICAL ' + critical_messages + warning_messages + disks_examined + perfdata)
             sys.exit(2)
         elif warn > 0:
-            print ('WARNING ' + warning_messages + disks_examined + output_perfdata)
+            print ('WARNING ' + warning_messages + disks_examined + perfdata)
             sys.exit(1)
         else:
-            print ('OK - No disk temperature issues. Disks examined:' + disks_examined + output_perfdata)
+            print ('OK - No disk temperature issues. Disks examined:' + disks_examined + perfdata)
             sys.exit(0)
 
     def check_zpool(self):
@@ -591,7 +590,6 @@ class Startup(object):
         cpus_examined = ''
         cpu_count = 0
         all_cpu_names = ''
-        output_perfdata = ''
         perfdata = ''
         if (self._perfdata):
             perfdata= ';|'
@@ -653,17 +651,14 @@ class Startup(object):
             else:
                 critical_messages = '- No CPU found matching {} (no CPUs reported by server)'.format(self._name)
 
-        if self._perfdata:
-            output_perfdata = ' |' + perfdata
-
         if crit > 0:
-            print ('CRITICAL ' + critical_messages + warning_messages + cpus_examined + output_perfdata)
+            print ('CRITICAL ' + critical_messages + warning_messages + cpus_examined + perfdata)
             sys.exit(2)
         elif warn > 0:
-            print ('WARNING ' + warning_messages + cpus_examined + output_perfdata)
+            print ('WARNING ' + warning_messages + cpus_examined + perfdata)
             sys.exit(1)
         else:
-            print ('OK - No CPU temperature issues. CPUs examined:' + cpus_examined + output_perfdata)
+            print ('OK - No CPU temperature issues. CPUs examined:' + cpus_examined + perfdata)
             sys.exit(0)
 
     def check_load(self):
