@@ -345,7 +345,10 @@ class Startup(object):
             else:
                 critical_messages = '- No disk found matching {} (no disks reported by server)'.format(self._name)
 
-        if crit > 0:
+        if(disks_examined == ''):
+            print ('UNKNOWN - check_disk_temps() - No temperatures received.')
+            sys.exit(3)
+        elif crit > 0:
             print ('CRITICAL ' + critical_messages + warning_messages + disks_examined + perfdata)
             sys.exit(2)
         elif warn > 0:
@@ -605,13 +608,6 @@ class Startup(object):
         )
         temperatures = self.do_request('reporting.get_data', queryOptions)
 
-        #Check if we received any temperatures. If TrueNAS is installed in a VM, it might not report CPU temperatures.
-        try:
-            temperatures[0]['aggregations']['mean']['cpu']
-        except:
-            print ('UNKNOWN - check_cpu_temps() - No temperatures received: ' + str(sys.exc_info()))
-            sys.exit(3)
-
         try:
             for cpu_name in temperatures[0]['aggregations']['mean']:
                 all_cpu_names += cpu_name + ' '
@@ -651,6 +647,9 @@ class Startup(object):
             else:
                 critical_messages = '- No CPU found matching {} (no CPUs reported by server)'.format(self._name)
 
+        if(cpus_examined == ''):
+            print ('UNKNOWN - check_cpu_temps() - No temperatures received.')
+            sys.exit(3)
         if crit > 0:
             print ('CRITICAL ' + critical_messages + warning_messages + cpus_examined + perfdata)
             sys.exit(2)
