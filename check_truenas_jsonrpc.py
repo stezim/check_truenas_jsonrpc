@@ -301,8 +301,8 @@ class Startup(object):
         disks_examined = ''
         perfdata = ''
         if (self._perfdata):
-            perfdata= ';|'
-            
+            perfdata= ' |'
+
         all_disk_names = ''
         actual_disk_count = 0
 
@@ -437,7 +437,7 @@ class Startup(object):
         all_root_level_dataset_names = ''
         perfdata = ''
         if (self._perfdata):
-            perfdata= ';|'
+            perfdata= ' |'
 
         # We allow filtering on pool name here
         looking_for_all_pools = self._name.lower() == 'all'
@@ -592,7 +592,7 @@ class Startup(object):
         all_cpu_names = ''
         perfdata = ''
         if (self._perfdata):
-            perfdata= ';|'
+            perfdata= '|'
 
         all_cpus = self._name.lower() == 'all'
 
@@ -679,7 +679,7 @@ class Startup(object):
         warning_messages = ''
         perfdata = ''
         if (self._perfdata):
-            perfdata= ';|'
+            perfdata= ' |'
 
         queryOptions = (
             [
@@ -754,7 +754,7 @@ class Startup(object):
         warning_messages = ''
         perfdata = ''
         if (self._perfdata):
-            perfdata= ';|'
+            perfdata= ' |'
 
         queryOptions1 = (
             [
@@ -843,7 +843,7 @@ def main():
     parser.add_argument('-H', '--hostname', required=True, type=str, help='Hostname or IP address')
     parser.add_argument('-u', '--user', required=False, type=str, help='Username, if not specified: use API Key')
     parser.add_argument('-p', '--passwd', required=True, type=str, help='Password or API Key')
-    parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, update, disk_temps, cpu_temps, (load, memory)')
+    parser.add_argument('-t', '--type', required=True, type=str, help='Type of check, either alerts, zpool, zpool_capacity, repl, update, disk_temps, cpu_temps, load, memory')
     parser.add_argument('-pn', '--zpoolname', required=False, type=str, default='all', help='For compatibility with older version of this plugin. Same as --name.')
     parser.add_argument('-n', '--name', required=False, type=str, default='all', help='Resource name (e.g. disk name, pool name). Optional.')
     parser.add_argument('-ns', '--no-ssl', required=False, action='store_true', help='Disable SSL (use WS); default is to use SSL (use WSS)')

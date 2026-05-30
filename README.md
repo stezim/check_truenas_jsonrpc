@@ -8,7 +8,7 @@ Feel free to open an issue for bugs, improvements or feature requests.
 ```
 usage: check_truenas_jsonrpc.py [-h] -H HOSTNAME [-u USER] -p PASSWD -t TYPE [-pn ZPOOLNAME] [-n NAME] [-ns] [-nv] [-ig] [-d] [-zw ZPOOL_WARN] [-zc ZPOOL_CRITICAL] [-zp] [-w WARN] [-c CRIT] [-pd]
 
-Checks a TrueNAS server using the JSON-RPC 2.0 over WebSocket API. Version 2.2
+Checks a TrueNAS server using the JSON-RPC 2.0 over WebSocket API. Version 2.3
 
 options:
   -h, --help            show this help message and exit
@@ -16,7 +16,7 @@ options:
                         Hostname or IP address
   -u, --user USER       Username, if not specified: use API Key
   -p, --passwd PASSWD   Password or API Key
-  -t, --type TYPE       Type of check, either alerts, zpool, zpool_capacity, repl, update, or disk_temps
+  -t, --type TYPE       Type of check, either alerts, zpool, zpool_capacity, repl, update, disk_temps, cpu_temps, load, memory
   -pn, --zpoolname ZPOOLNAME
                         For compatibility with older version of this plugin. Same as --name.
   -n, --name NAME       Resource name (e.g. disk name, pool name). Optional.
@@ -35,7 +35,6 @@ options:
   -w, --warn WARN       Warning threshold (Integer). Optional.
   -c, --crit CRIT       Critical threshold (Integer). Optional.
   -pd, --perfdata       Add perf data to output. Optional.
-
 ```
 # Requirements
 
