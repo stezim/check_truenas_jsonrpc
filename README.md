@@ -68,3 +68,9 @@ Added support for API query filters and options. Reworked check_zpool_capacity t
 
 Added more general --warn, --crit, --name and --perfdata flags while keeping compatibility with the old --zpool-warn, --zpool-critical, --zpoolname and --zpool-perfdata flags.
 With "check_disk_temps" @MisterMountain added the first non-zpool check that use those flags. 
+
+*30.06.2026 - Version 2.3* 
+
+Added three more check types: cpu_temps, load, and memory. Cleaned up the perfdata output by removing the leading semicolon (;). 
+Changed disk_temps to return UNKNOWN when no temperatures where received, to align with cpu_temps. 
+Moved the websocket connection initialisation to the __init__ function to avoid checks that use multiple API calls creating multiple websocket connections.
